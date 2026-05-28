@@ -1,0 +1,17 @@
+{
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "explicit"
+  },
+  "editor.tabSize": 4,
+  "eslint.useFlatConfig": true,
+  "stylelint.enable": true,
+  "stylelint.autoFixOnSave": true,
+  "stylelint.useLocal": true
+}

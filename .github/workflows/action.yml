@@ -1,0 +1,31 @@
+name: Deploy on Raspberry Pi
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: SSH to Raspberry Pi and deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.RASPBERRY_PI_HOST }}
+          username: ${{ secrets.RASPBERRY_PI_USERNAME }}
+          password: ${{ secrets.RASPBERRY_PI_PASSWORD }}
+          port: ${{ secrets.RASPBERRY_PI_PORT }}
+          script: |
+            cd /app/urlala-server
+            git fetch
+            git reset origin/main --hard
+            export NVM_DIR=~/.nvm
+            source ~/.nvm/nvm.sh 
+            npm i -g pnpm
+            pnpm install
+            pnpm pm2
