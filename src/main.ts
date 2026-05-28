@@ -1,3 +1,4 @@
+import "dotenv/config"
 import { NestFactory } from "@nestjs/core"
 import type { NestFastifyApplication } from "@nestjs/platform-fastify"
 import { FastifyAdapter } from "@nestjs/platform-fastify"
