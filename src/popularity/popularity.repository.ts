@@ -1,8 +1,8 @@
 import { Injectable } from "@nestjs/common"
-import { and, eq, lt, sql } from "drizzle-orm"
+import { lt, sql } from "drizzle-orm"
 import { db } from "../database/client"
-import { popularUrls, popularUrlStats } from "../database/schema"
-import type { BucketType, MetricDeltas } from "./types"
+import { popularUrlHourlyStats, popularUrls } from "../database/schema"
+import type { MetricDeltas } from "./types"
 
 // Calculates the same weighted score used by the popular URL ranking query.
 const scoreOf = (deltas: MetricDeltas): number =>
@@ -10,88 +10,60 @@ const scoreOf = (deltas: MetricDeltas): number =>
 
 @Injectable()
 export class PopularityRepository {
-  // Upserts the URL master row and increments day/week/month stat rows in one DB transaction.
-  async upsertUrlStats(
-    url: string,
-    deltas: MetricDeltas,
-    bucketStarts: Record<BucketType, string>
-  ): Promise<void> {
+  async upsertUrlHourlyStats(url: string, deltas: MetricDeltas, bucketHour: Date): Promise<void> {
     const now = new Date()
     const deltaScore = scoreOf(deltas)
 
     await db.transaction(async (tx) => {
       const [popularUrl] = await tx
         .insert(popularUrls)
-        .values({
-          url,
-          updatedAt: now,
-        })
-        .onConflictDoUpdate({
-          target: popularUrls.url,
-          set: {
-            updatedAt: now,
-          },
-        })
+        .values({ url, updatedAt: now })
+        .onConflictDoUpdate({ target: popularUrls.url, set: { updatedAt: now } })
         .returning({ id: popularUrls.id })
 
       if (!popularUrl) throw new Error(`Failed to upsert popular URL: ${url}`)
 
       await tx
-        .insert(popularUrlStats)
-        .values(
-          (["day", "week", "month"] satisfies BucketType[]).map((bucketType) => ({
-            popularUrlId: popularUrl.id,
-            bucketType,
-            bucketStart: bucketStarts[bucketType],
-            clickCount: deltas.view,
-            saveCount: deltas.save,
-            likeCount: deltas.like,
-            commentCount: deltas.comment,
-            score: deltaScore,
-            updatedAt: now,
-          }))
-        )
+        .insert(popularUrlHourlyStats)
+        .values({
+          popularUrlId: popularUrl.id,
+          bucketHour,
+          clickCount: deltas.view,
+          saveCount: deltas.save,
+          likeCount: deltas.like,
+          commentCount: deltas.comment,
+          score: deltaScore,
+          updatedAt: now,
+        })
         .onConflictDoUpdate({
-          target: [
-            popularUrlStats.popularUrlId,
-            popularUrlStats.bucketType,
-            popularUrlStats.bucketStart,
-          ],
+          target: [popularUrlHourlyStats.popularUrlId, popularUrlHourlyStats.bucketHour],
           set: {
-            clickCount: sql`${popularUrlStats.clickCount} + ${deltas.view}`,
-            saveCount: sql`${popularUrlStats.saveCount} + ${deltas.save}`,
-            likeCount: sql`${popularUrlStats.likeCount} + ${deltas.like}`,
-            commentCount: sql`${popularUrlStats.commentCount} + ${deltas.comment}`,
+            clickCount: sql`${popularUrlHourlyStats.clickCount} + ${deltas.view}`,
+            saveCount: sql`${popularUrlHourlyStats.saveCount} + ${deltas.save}`,
+            likeCount: sql`${popularUrlHourlyStats.likeCount} + ${deltas.like}`,
+            commentCount: sql`${popularUrlHourlyStats.commentCount} + ${deltas.comment}`,
             score: sql`
-							(${popularUrlStats.saveCount} + ${deltas.save}) * 5
-							+ (${popularUrlStats.likeCount} + ${deltas.like}) * 3
-							+ (${popularUrlStats.commentCount} + ${deltas.comment}) * 2
-							+ (${popularUrlStats.clickCount} + ${deltas.view})
-						`,
+              (${popularUrlHourlyStats.saveCount} + ${deltas.save}) * 5
+              + (${popularUrlHourlyStats.likeCount} + ${deltas.like}) * 3
+              + (${popularUrlHourlyStats.commentCount} + ${deltas.comment}) * 2
+              + (${popularUrlHourlyStats.clickCount} + ${deltas.view})
+            `,
             updatedAt: now,
           },
         })
     })
   }
 
-  // Deletes stat rows older than the retention cutoff for each bucket type.
-  async cleanupStats(cutoffs: Record<BucketType, string>): Promise<void> {
-    await db
-      .delete(popularUrlStats)
-      .where(
-        and(eq(popularUrlStats.bucketType, "day"), lt(popularUrlStats.bucketStart, cutoffs.day))
-      )
+  async cleanupHourlyStats(cutoff: Date): Promise<void> {
+    await db.delete(popularUrlHourlyStats).where(lt(popularUrlHourlyStats.bucketHour, cutoff))
 
-    await db
-      .delete(popularUrlStats)
-      .where(
-        and(eq(popularUrlStats.bucketType, "week"), lt(popularUrlStats.bucketStart, cutoffs.week))
+    await db.execute(sql`
+      delete from popular_urls
+      where not exists (
+        select 1
+        from popular_url_hourly_stats
+        where popular_url_hourly_stats.popular_url_id = popular_urls.id
       )
-
-    await db
-      .delete(popularUrlStats)
-      .where(
-        and(eq(popularUrlStats.bucketType, "month"), lt(popularUrlStats.bucketStart, cutoffs.month))
-      )
+    `)
   }
 }

@@ -1,16 +1,4 @@
-import { sql } from "drizzle-orm"
-import {
-  bigint,
-  check,
-  date,
-  index,
-  numeric,
-  pgTable,
-  text,
-  timestamp,
-  unique,
-  uuid,
-} from "drizzle-orm/pg-core"
+import { bigint, index, numeric, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core"
 
 export const popularUrls = pgTable("popular_urls", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -22,15 +10,14 @@ export const popularUrls = pgTable("popular_urls", {
 export type PopularUrls = typeof popularUrls.$inferSelect
 export type NewPopularUrls = typeof popularUrls.$inferInsert
 
-export const popularUrlStats = pgTable(
-  "popular_url_stats",
+export const popularUrlHourlyStats = pgTable(
+  "popular_url_hourly_stats",
   {
     id: uuid("id").defaultRandom().primaryKey(),
     popularUrlId: uuid("popular_url_id")
       .notNull()
       .references(() => popularUrls.id, { onDelete: "cascade" }),
-    bucketType: text("bucket_type").notNull(),
-    bucketStart: date("bucket_start").notNull(),
+    bucketHour: timestamp("bucket_hour", { withTimezone: true }).notNull(),
     clickCount: bigint("click_count", { mode: "number" }).notNull().default(0),
     saveCount: bigint("save_count", { mode: "number" }).notNull().default(0),
     likeCount: bigint("like_count", { mode: "number" }).notNull().default(0),
@@ -40,18 +27,12 @@ export const popularUrlStats = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    check(
-      "popular_url_stats_bucket_type_check",
-      sql`${table.bucketType} in ('day', 'week', 'month')`
-    ),
-    unique("popular_url_stats_popular_url_id_bucket_type_bucket_start_key").on(
+    unique("popular_url_hourly_stats_popular_url_id_bucket_hour_key").on(
       table.popularUrlId,
-      table.bucketType,
-      table.bucketStart
+      table.bucketHour
     ),
-    index("popular_url_stats_rank_idx").on(
-      table.bucketType,
-      table.bucketStart,
+    index("popular_url_hourly_stats_bucket_hour_rank_idx").on(
+      table.bucketHour,
       table.score.desc(),
       table.saveCount.desc(),
       table.likeCount.desc(),
@@ -61,5 +42,5 @@ export const popularUrlStats = pgTable(
   ]
 )
 
-export type PopularUrlStats = typeof popularUrlStats.$inferSelect
-export type NewPopularUrlStats = typeof popularUrlStats.$inferInsert
+export type PopularUrlHourlyStats = typeof popularUrlHourlyStats.$inferSelect
+export type NewPopularUrlHourlyStats = typeof popularUrlHourlyStats.$inferInsert

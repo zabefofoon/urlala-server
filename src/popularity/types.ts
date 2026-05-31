@@ -1,5 +1,4 @@
 export type CollectType = "view" | "like" | "save" | "comment"
-export type BucketType = "day" | "week" | "month"
 
 export type MetricDeltas = Record<CollectType, number>
 
