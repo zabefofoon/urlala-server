@@ -1,8 +1,13 @@
 import { Injectable } from "@nestjs/common"
 import { Redis } from "@upstash/redis"
 import { randomUUID } from "node:crypto"
-import { DELTA_KEYS, DIRTY_URLS_KEY, REDIS_DELTA_KEYS } from "./consts"
-import type { MetricDeltas } from "./types"
+import {
+  DELTA_KEYS,
+  DIRTY_URLS_KEY,
+  POPULAR_URLS_CACHE_TTL_SECONDS,
+  REDIS_DELTA_KEYS,
+} from "./consts"
+import type { MetricDeltas, PopularBucketType, PopularUrl } from "./types"
 
 const ACK_DELTAS_SCRIPT = `
 local url = ARGV[1]
@@ -103,5 +108,15 @@ export class PopularityRedisService {
       [...REDIS_DELTA_KEYS, DIRTY_URLS_KEY],
       [url, deltas.view, deltas.like, deltas.save, deltas.comment]
     )
+  }
+
+  async setPopularUrlsCache(
+    type: PopularBucketType,
+    limit: number,
+    popularUrls: PopularUrl[]
+  ): Promise<void> {
+    await this.redis.set(`popular-urls:${type}:${limit}:v1`, popularUrls, {
+      ex: POPULAR_URLS_CACHE_TTL_SECONDS,
+    })
   }
 }
