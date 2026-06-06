@@ -6,7 +6,7 @@ export const CLEANUP_LOCK_KEY = "lock:popular_url_stats:cleanup"
 export const SEOUL_TIMEZONE = "Asia/Seoul"
 export const POPULARITY_SYNC_BATCH_LIMIT = 1000
 export const POPULAR_URLS_CACHE_LIMIT = 20
-export const POPULAR_URLS_CACHE_TTL_SECONDS = 60 * 10
+export const POPULAR_URLS_CACHE_TTL_SECONDS = 60 * 15
 export const POPULAR_BUCKET_TYPES = ["day", "week", "month"] as const
 
 export const DELTA_KEYS: Record<CollectType, string> = {
